@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Roni API System 💪🔥</title>
+  <style>
+    body {
+      background: #0d0d0d;
+      color: #00ff99;
+      font-family: "Poppins", sans-serif;
+      text-align: center;
+      padding: 50px;
+    }
+    h1 {
+      color: #00ff99;
+    }
+    button {
+      background: #00ff99;
+      color: #000;
+      border: none;
+      padding: 12px 25px;
+      border-radius: 10px;
+      font-size: 16px;
+      cursor: pointer;
+      margin: 10px;
+    }
+    button:hover {
+      background: #00cc77;
+    }
+    input {
+      padding: 10px;
+      width: 250px;
+      border-radius: 8px;
+      border: 2px solid #00ff99;
+      background: #000;
+      color: #00ff99;
+      text-align: center;
+    }
+    .output {
+      margin-top: 25px;
+      font-size: 18px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>🔥 Roni API System 🔑</h1>
+  <button onclick="generateKey()">Generate Key</button>
+  <div class="output" id="keyOutput"></div>
+
+  <hr style="margin: 30px 0; border-color: #00ff99;">
+
+  <h2>🔍 Verify Key</h2>
+  <input type="text" id="verifyKey" placeholder="Enter your key...">
+  <button onclick="verifyKey()">Verify</button>
+  <div class="output" id="verifyOutput"></div>
+
+  <script>
+    const apiBase = "https://roni-api-system.onrender.com";
+
+    async function generateKey() {
+      document.getElementById("keyOutput").innerHTML = "⏳ Generating...";
+      const res = await fetch(`${apiBase}/generate`);
+      const data = await res.json();
+      document.getElementById("keyOutput").innerHTML = "✅ Your Key: <b>" + data.key + "</b>";
+    }
+
+    async function verifyKey() {
+      const key = document.getElementById("verifyKey").value.trim();
+      if (!key) return alert("Please enter a key!");
+      document.getElementById("verifyOutput").innerHTML = "⏳ Checking...";
+      const res = await fetch(`${apiBase}/verify?key=${key}`);
+      const data = await res.json();
+      document.getElementById("verifyOutput").innerHTML = data.message;
+    }
+  </script>
+
+</body>
+</html>
