@@ -1,80 +1,90 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html>
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Roni API System 💪🔥</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Roni API System 🔑</title>
   <style>
-    body {
-      background: #0d0d0d;
-      color: #00ff99;
-      font-family: "Poppins", sans-serif;
-      text-align: center;
-      padding: 50px;
+    :root{
+      --bg:#050505; --card:#091010; --accent:#00ff88;
     }
-    h1 {
-      color: #00ff99;
-    }
-    button {
-      background: #00ff99;
-      color: #000;
-      border: none;
-      padding: 12px 25px;
-      border-radius: 10px;
-      font-size: 16px;
-      cursor: pointer;
-      margin: 10px;
-    }
-    button:hover {
-      background: #00cc77;
-    }
-    input {
-      padding: 10px;
-      width: 250px;
-      border-radius: 8px;
-      border: 2px solid #00ff99;
-      background: #000;
-      color: #00ff99;
-      text-align: center;
-    }
-    .output {
-      margin-top: 25px;
-      font-size: 18px;
-    }
+    body{background:linear-gradient(135deg,#020202,#071018);color:#e6fff3;font-family:Inter,system-ui,Arial;min-height:100vh;margin:0;display:flex;align-items:center;justify-content:center}
+    .box{width:95%;max-width:420px;padding:28px;border-radius:14px;background:rgba(0,0,0,0.45);box-shadow:0 6px 30px rgba(0,0,0,0.6);text-align:center;border:1px solid rgba(0,255,136,0.06)}
+    .led{font-weight:900;color:var(--accent);font-size:28px;letter-spacing:1px;margin-bottom:18px}
+    .title{font-size:28px;color:var(--accent);margin:8px 0}
+    .btn{display:inline-block;padding:14px 28px;border-radius:12px;background:linear-gradient(90deg,#00ff99,#00cc77);color:#001;font-weight:700;border:none;cursor:pointer;margin:12px 0}
+    .input{width:100%;padding:12px;border-radius:10px;border:2px solid rgba(0,255,136,0.18);background:#050505;color:var(--accent);text-align:center}
+    .small{font-size:13px;color:#9ddfb6}
+    .out{margin-top:16px;color:#00ff99;font-weight:700}
+    .preset{display:flex;gap:8px;justify-content:center;margin-bottom:10px}
+    .preset button{padding:8px 12px;border-radius:8px;background:#081717;color:var(--accent);border:1px solid rgba(0,255,136,0.12);cursor:pointer}
   </style>
 </head>
 <body>
+  <div class="box">
+    <div class="led">☠️ Roni Mod Menu ☠️</div>
+    <div class="title">Generate Key</div>
 
-  <h1>🔥 Roni API System 🔑</h1>
-  <button onclick="generateKey()">Generate Key</button>
-  <div class="output" id="keyOutput"></div>
+    <div class="preset">
+      <button onclick="generatePreset(1)">1 day</button>
+      <button onclick="generatePreset(5)">5 day</button>
+      <button onclick="generatePreset(7)">7 day</button>
+      <button onclick="generatePreset(30)">30 day</button>
+      <button onclick="generatePreset(60)">60 day</button>
+    </div>
 
-  <hr style="margin: 30px 0; border-color: #00ff99;">
+    <div style="margin:10px 0">
+      <input id="customDays" class="input" placeholder="Custom days (leave blank = unlimited)">
+    </div>
+    <button class="btn" onclick="generate()">Generate Key</button>
 
-  <h2>🔍 Verify Key</h2>
-  <input type="text" id="verifyKey" placeholder="Enter your key...">
-  <button onclick="verifyKey()">Verify</button>
-  <div class="output" id="verifyOutput"></div>
+    <div class="out" id="result"></div>
 
-  <script>
-    const apiBase = "https://roni-api-system.onrender.com";
+    <hr style="margin:18px 0;border-color:rgba(0,255,136,0.08)">
 
-    async function generateKey() {
-      document.getElementById("keyOutput").innerHTML = "⏳ Generating...";
-      const res = await fetch(`${apiBase}/generate`);
-      const data = await res.json();
-      document.getElementById("keyOutput").innerHTML = "✅ Your Key: <b>" + data.key + "</b>";
+    <div class="title">Verify Key</div>
+    <input id="verify" class="input" placeholder="Enter key to verify">
+    <button class="btn" onclick="verify()">Verify</button>
+    <div class="small" id="verifyMsg"></div>
+  </div>
+
+<script>
+async function generatePreset(days){
+  document.getElementById('customDays').value = days;
+  await generate();
+}
+async function generate(){
+  const days = document.getElementById('customDays').value.trim();
+  const q = days ? `?days=${encodeURIComponent(days)}` : '';
+  document.getElementById('result').innerText = '⏳ Generating...';
+  try {
+    const res = await fetch('/generate' + q);
+    const j = await res.json();
+    if (j.success && j.key){
+      const k = j.key;
+      const created = new Date(k.createdAt).toLocaleString();
+      const exp = k.expiresAt ? new Date(k.expiresAt).toLocaleString() : 'Never';
+      document.getElementById('result').innerHTML = `✅ <b>${k.key}</b><br>Created: ${created}<br>Expires: ${exp}`;
+    } else {
+      document.getElementById('result').innerText = 'Error generating key';
     }
+  } catch(e){
+    document.getElementById('result').innerText = 'Network error';
+  }
+}
 
-    async function verifyKey() {
-      const key = document.getElementById("verifyKey").value.trim();
-      if (!key) return alert("Please enter a key!");
-      document.getElementById("verifyOutput").innerHTML = "⏳ Checking...";
-      const res = await fetch(`${apiBase}/verify?key=${key}`);
-      const data = await res.json();
-      document.getElementById("verifyOutput").innerHTML = data.message;
-    }
-  </script>
-
+async function verify(){
+  const key = document.getElementById('verify').value.trim();
+  if (!key) return alert('Enter key');
+  document.getElementById('verifyMsg').innerText = '⏳ Checking...';
+  try{
+    const res = await fetch('/verify?key=' + encodeURIComponent(key));
+    const j = await res.json();
+    document.getElementById('verifyMsg').innerText = j.message || JSON.stringify(j);
+  }catch(e){
+    document.getElementById('verifyMsg').innerText = 'Network error';
+  }
+}
+</script>
 </body>
-    </html>
+</html>
