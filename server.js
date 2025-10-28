@@ -1,20 +1,19 @@
 const express = require("express");
+const path = require("path");
 const fs = require("fs");
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
-app.use(express.static("public"));
+app.use(express.static(path.join(__dirname, "public")));
 
 const KEYS_FILE = "keys.json";
 
-// Load keys
 let keys = [];
 if (fs.existsSync(KEYS_FILE)) {
   keys = JSON.parse(fs.readFileSync(KEYS_FILE));
 }
 
-// Generate random key
 function generateKey() {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
   let key = "RONI-";
@@ -22,7 +21,6 @@ function generateKey() {
   return key;
 }
 
-// Generate new key
 app.get("/generate", (req, res) => {
   const newKey = generateKey();
   keys.push(newKey);
@@ -30,7 +28,6 @@ app.get("/generate", (req, res) => {
   res.json({ success: true, key: newKey });
 });
 
-// Verify key
 app.get("/verify", (req, res) => {
   const { key } = req.query;
   if (keys.includes(key)) {
@@ -39,10 +36,11 @@ app.get("/verify", (req, res) => {
     return res.json({ valid: false, message: "❌ Invalid key" });
   }
 });
-// Admin page route
+
 app.get("/admin", (req, res) => {
-  res.sendFile(__dirname + "/public/admin.html");
+  res.sendFile(path.join(__dirname, "public", "admin.html"));
 });
+
 app.get("/", (req, res) => {
   res.send("Welcome to Roni API System 💪🔥");
 });
