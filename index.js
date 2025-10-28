@@ -1,19 +1,22 @@
-const express = require("express");
-const app = express();
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Roni API System</title>
+</head>
+<body>
+  <h1>Welcome to Roni API System</h1>
+  <p>Enter your key to verify:</p>
+  <input id="key" placeholder="Enter API key" />
+  <button id="check">Verify</button>
 
-app.get("/", (req, res) => {
-  res.send("Welcome to RONI API SYSTEM 🔥");
-});
-
-app.get("/verify", (req, res) => {
-  const key = req.query.key;
-  if (key === "RONI123") {
-    res.json({ success: true, message: "Key verified ✅" });
-  } else {
-    res.json({ success: false, message: "Invalid key ❌" });
-  }
-});
-
-app.listen(3000, () => {
-  console.log("Server running on port 3000");
-});
+  <script>
+    document.getElementById("check").addEventListener("click", async () => {
+      const key = document.getElementById("key").value.trim();
+      const res = await fetch(`/verify?key=${key}`);
+      const data = await res.json();
+      if (data.valid) alert("✅ Key is valid!");
+      else alert("❌ Invalid key!");
+    });
+  </script>
+</body>
+</html>
