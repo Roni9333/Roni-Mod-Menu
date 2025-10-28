@@ -1,17 +1,15 @@
 const express = require("express");
 const fs = require("fs");
 const path = require("path");
-const crypto = require("crypto");
-
 const app = express();
 const PORT = process.env.PORT || 3000;
-const KEYS_FILE = path.join(__dirname, "keys.json");
-
-// Admin password: change or set environment variable ADMIN_PASSWORD
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "roni6294";
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
+const KEYS_FILE = path.join(__dirname, "keys.json");
+
+// Change this password for production
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "roni6294";
 
 // load keys
 let keys = [];
@@ -19,7 +17,7 @@ function loadKeys() {
   try {
     if (fs.existsSync(KEYS_FILE)) {
       const raw = fs.readFileSync(KEYS_FILE, "utf8");
-      keys = JSON.parse(raw || "[]");
+      keys = raw ? JSON.parse(raw) : [];
     } else {
       keys = [];
       fs.writeFileSync(KEYS_FILE, JSON.stringify(keys, null, 2));
@@ -30,148 +28,139 @@ function loadKeys() {
   }
 }
 function saveKeys() {
-  fs.writeFileSync(KEYS_FILE, JSON.stringify(keys, null, 2));
+  try {
+    fs.writeFileSync(KEYS_FILE, JSON.stringify(keys, null, 2));
+  } catch (e) {
+    console.error("Failed to save keys:", e);
+  }
 }
 loadKeys();
 
-// helper generate unique key
-function makeKey() {
-  // RONI- + 8 chars
-  return "RONI-" + crypto.randomBytes(4).toString("hex").toUpperCase();
-}
-
-function ensureExpiry(obj) {
-  // mark expired if past expiresAt
-  if (obj.expiresAt && Date.now() > obj.expiresAt) {
-    obj.active = false;
+// helper to create key object
+function makeKeyObject(days) {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  let suffix = "";
+  for (let i = 0; i < 8; i++) suffix += chars[Math.floor(Math.random() * chars.length)];
+  const key = `RONI-${suffix}`;
+  const createdAt = Date.now();
+  let expiresAt = null;
+  if (days && Number(days) > 0) {
+    expiresAt = createdAt + Number(days) * 24 * 60 * 60 * 1000;
   }
-  return obj;
-}
-
-// Middleware: admin check using Authorization: Bearer <password>
-function adminAuth(req, res, next) {
-  const auth = req.headers.authorization || "";
-  if (auth.startsWith("Bearer ")) {
-    const token = auth.slice(7);
-    if (token === ADMIN_PASSWORD) return next();
-  }
-  return res.status(401).json({ error: "Unauthorized" });
-}
-
-// Public endpoints
-
-// Generate one key; optional query days (integer) to set expiry
-app.get("/generate", (req, res) => {
-  const days = parseInt(req.query.days || "0", 10);
-  const newKey = {
-    key: makeKey(),
-    createdAt: Date.now(),
-    expiresAt: days > 0 ? Date.now() + days * 24 * 60 * 60 * 1000 : null,
-    active: true,
+  return {
+    key,
+    createdAt,
+    expiresAt,   // null = unlimited
     lastLogin: null,
-    note: req.query.note || null
+    active: true,
+    note: ""
   };
-  keys.push(newKey);
-  saveKeys();
-  res.json({ success: true, key: newKey.key, meta: newKey });
-});
+}
 
-// Verify key
-app.get("/verify", (req, res) => {
-  const { key } = req.query;
-  if (!key) return res.json({ valid: false, message: "No key provided" });
-
-  const obj = keys.find(k => k.key === key);
-  if (!obj) return res.json({ valid: false, message: "❌ Invalid key" });
-
-  ensureExpiry(obj);
-
-  if (!obj.active) {
-    const expiredMessage = obj.expiresAt && Date.now() > obj.expiresAt
-      ? "❌ Key expired"
-      : "⛔ Key is deactivated";
-    saveKeys();
-    return res.json({ valid: false, message: expiredMessage });
+// generate key (GET for quick testing). Option: ?days=7 or ?preset=1|5|7|30|60
+app.get("/generate", (req, res) => {
+  const { days, preset, note } = req.query;
+  let d = 0;
+  if (preset) {
+    const map = { "1":1, "5":5, "7":7, "30":30, "60":60 };
+    d = map[preset] || 0;
+  } else if (days) {
+    d = Number(days) || 0;
   }
-
-  obj.lastLogin = Date.now();
-  saveKeys();
-  return res.json({ valid: true, message: "✅ Key is valid", meta: obj });
-});
-
-// Admin endpoints (protected)
-app.post("/admin/login", (req, res) => {
-  const { password } = req.body || {};
-  if (password === ADMIN_PASSWORD) {
-    // For simplicity we return success; admin front-end will use password as bearer token
-    return res.json({ success: true });
-  }
-  return res.json({ success: false, message: "Wrong password" });
-});
-
-// get all keys
-app.get("/admin/keys", adminAuth, (req, res) => {
-  // update expiry flags before sending
-  keys.forEach(k => ensureExpiry(k));
-  saveKeys();
-  res.json({ keys });
-});
-
-// admin generate (body: {qty, days, note})
-app.post("/admin/generate", adminAuth, (req, res) => {
-  const qty = Math.max(1, Math.min(200, parseInt(req.body.qty || 1)));
-  const days = parseInt(req.body.days || 0, 10);
-  const note = req.body.note || null;
-  const gen = [];
-  for (let i = 0; i < qty; i++) {
-    const newKey = {
-      key: makeKey(),
-      createdAt: Date.now(),
-      expiresAt: days > 0 ? Date.now() + days * 24 * 60 * 60 * 1000 : null,
-      active: true,
-      lastLogin: null,
-      note
-    };
-    keys.push(newKey);
-    gen.push(newKey);
-  }
-  saveKeys();
-  res.json({ success: true, generated: gen });
-});
-
-// toggle active on/off (body { key, active })
-app.post("/admin/toggle", adminAuth, (req, res) => {
-  const { key, active } = req.body || {};
-  const obj = keys.find(k => k.key === key);
-  if (!obj) return res.status(404).json({ success: false, message: "Not found" });
-  obj.active = !!active;
-  saveKeys();
-  res.json({ success: true, key: obj.key, active: obj.active });
-});
-
-// update expiry date (body { key, expiresAt }) - expiresAt: timestamp or null
-app.post("/admin/setExpiry", adminAuth, (req, res) => {
-  const { key, expiresAt } = req.body || {};
-  const obj = keys.find(k => k.key === key);
-  if (!obj) return res.status(404).json({ success: false, message: "Not found" });
-  obj.expiresAt = expiresAt ? Number(expiresAt) : null;
-  ensureExpiry(obj);
+  const obj = makeKeyObject(d);
+  if (note) obj.note = String(note).slice(0,200);
+  keys.push(obj);
   saveKeys();
   res.json({ success: true, key: obj });
 });
 
-// delete key
-app.post("/admin/delete", adminAuth, (req, res) => {
-  const { key } = req.body || {};
-  const before = keys.length;
-  keys = keys.filter(k => k.key !== key);
+// verify key (used by app). It updates lastLogin if valid.
+app.get("/verify", (req, res) => {
+  const { key } = req.query;
+  if (!key) return res.json({ valid: false, message: "No key provided" });
+  const k = keys.find(x => x.key === key);
+  if (!k) return res.json({ valid: false, message: "❌ Invalid key" });
+  if (!k.active) return res.json({ valid: false, message: "❌ Key is turned off" });
+  if (k.expiresAt && Date.now() > k.expiresAt) {
+    return res.json({ valid: false, message: "❌ Key expired" });
+  }
+  k.lastLogin = Date.now();
   saveKeys();
-  res.json({ success: true, removed: before - keys.length });
+  return res.json({ valid: true, message: "✅ Key is valid" });
 });
 
-// small root text
+// admin: login (simple)
+app.post("/admin/login", (req, res) => {
+  const { password } = req.body;
+  if (password === ADMIN_PASSWORD) return res.json({ success: true });
+  return res.json({ success: false, message: "Wrong password" });
+});
+
+// admin: list keys
+app.get("/admin/keys", (req, res) => {
+  // return keys sorted newest first
+  const list = keys.slice().sort((a,b)=> b.createdAt - a.createdAt);
+  return res.json({ keys: list });
+});
+
+// admin: create keys (POST) with body { qty, days, note }
+app.post("/admin/create", (req, res) => {
+  const { qty = 1, days = 0, note = "" } = req.body;
+  const n = Math.max(1, Math.min(500, Number(qty)));
+  const created = [];
+  for (let i = 0; i < n; i++) {
+    const obj = makeKeyObject(days);
+    obj.note = note ? String(note).slice(0,200) : "";
+    keys.push(obj);
+    created.push(obj);
+  }
+  saveKeys();
+  return res.json({ success: true, created });
+});
+
+// admin: toggle active (POST) body { key }
+app.post("/admin/toggle", (req, res) => {
+  const { key } = req.body;
+  const k = keys.find(x => x.key === key);
+  if (!k) return res.json({ success: false, message: "Not found" });
+  k.active = !k.active;
+  saveKeys();
+  return res.json({ success: true, key: k });
+});
+
+// admin: delete
+app.post("/admin/delete", (req, res) => {
+  const { key } = req.body;
+  const before = keys.length;
+  keys = keys.filter(x => x.key !== key);
+  saveKeys();
+  return res.json({ success: true, removed: before - keys.length });
+});
+
+// admin: set expiry (POST) body { key, days } days=0 => unlimited, or expiresAt timestamp
+app.post("/admin/set-expiry", (req, res) => {
+  const { key, days } = req.body;
+  const k = keys.find(x => x.key === key);
+  if (!k) return res.json({ success: false, message: "Not found" });
+  if (days === null || days === undefined || Number(days) <= 0) {
+    k.expiresAt = null;
+  } else {
+    k.expiresAt = Date.now() + Number(days) * 24 * 60 * 60 * 1000;
+  }
+  saveKeys();
+  return res.json({ success: true, key: k });
+});
+
+// simple root
 app.get("/", (req, res) => {
-  res.send("Welcome to Roni API System - root. Use /index.html or /admin.html");
+  res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-app.listen(PORT, () => console.log(`Server listening on port ${PORT}`));
+// serve admin page
+app.get("/admin", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "admin.html"));
+});
+
+app.listen(PORT, () => {
+  console.log(`Roni API System running on port ${PORT}`);
+});
