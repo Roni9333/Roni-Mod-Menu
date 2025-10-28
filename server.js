@@ -5,7 +5,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
-app.use(express.static("public"));
+app.use(express.static(path.join(__dirname, "public")));;
 
 const KEYS_FILE = "keys.json";
 const ADMIN_PASSWORD = "roni6294"; // 🔐 Change this password!
