@@ -5,11 +5,12 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
-app.use(express.static(path.join(__dirname, "public")));;
+app.use(express.static(path.join(__dirname, "public")));
 
 const KEYS_FILE = "keys.json";
-const ADMIN_PASSWORD = "roni6294"; // 🔐 Change this password!
+const ADMIN_PASSWORD = "roni6294"; // 🔐 Change if you want
 
+// Load saved keys
 let keys = [];
 if (fs.existsSync(KEYS_FILE)) {
   keys = JSON.parse(fs.readFileSync(KEYS_FILE));
@@ -35,9 +36,9 @@ app.get("/generate", (req, res) => {
 app.get("/verify", (req, res) => {
   const { key } = req.query;
   if (keys.includes(key)) {
-    return res.json({ valid: true, message: "✅ Key is valid" });
+    res.json({ valid: true, message: "✅ Key is valid" });
   } else {
-    return res.json({ valid: false, message: "❌ Invalid key" });
+    res.json({ valid: false, message: "❌ Invalid key" });
   }
 });
 
@@ -51,12 +52,12 @@ app.post("/admin/login", (req, res) => {
   }
 });
 
-// Get all keys
+// Get all keys (Admin)
 app.get("/admin/keys", (req, res) => {
   res.json({ keys });
 });
 
-// Delete key
+// Delete a key
 app.post("/admin/delete", (req, res) => {
   const { key } = req.body;
   keys = keys.filter(k => k !== key);
@@ -64,8 +65,9 @@ app.post("/admin/delete", (req, res) => {
   res.json({ success: true });
 });
 
+// Routes
 app.get("/", (req, res) => {
-  res.send("Welcome to Roni API System 💪🔥");
+  res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
 app.get("/admin", (req, res) => {
