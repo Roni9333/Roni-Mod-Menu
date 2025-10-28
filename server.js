@@ -1,107 +1,77 @@
-const express = require("express");
-const fs = require("fs");
-const path = require("path");
-const app = express();
-const PORT = process.env.PORT || 3000;
+import express from "express";
+import fs from "fs";
+import cors from "cors";
+import bodyParser from "body-parser";
 
-app.use(express.json());
-app.use(express.static(path.join(__dirname, "public")));
+const app = express();
+app.use(cors());
+app.use(bodyParser.json());
+app.use(express.static("public"));
 
 const KEYS_FILE = "keys.json";
 const ADMIN_PASSWORD = "roni6294"; // Change if you want
 
-// Load saved keys
-let keys = [];
-if (fs.existsSync(KEYS_FILE)) {
-  keys = JSON.parse(fs.readFileSync(KEYS_FILE));
+// Helper: Read + Save keys
+function readKeys() {
+  if (!fs.existsSync(KEYS_FILE)) fs.writeFileSync(KEYS_FILE, "[]");
+  return JSON.parse(fs.readFileSync(KEYS_FILE, "utf-8"));
 }
-
-// Generate random key
-function generateKey() {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-  let key = "RONI-";
-  for (let i = 0; i < 8; i++) key += chars[Math.floor(Math.random() * chars.length)];
-  return key;
-}
-
-// Helper: save keys to file
-function saveKeys() {
+function saveKeys(keys) {
   fs.writeFileSync(KEYS_FILE, JSON.stringify(keys, null, 2));
 }
 
-// Clean expired keys automatically (optional)
-function removeExpiredKeys() {
-  const now = new Date();
-  keys = keys.filter(k => new Date(k.expiresAt) > now);
-  saveKeys();
-}
-setInterval(removeExpiredKeys, 3600000); // every 1 hour
-
-// Generate new key (auto expires in 7 days)
-app.get("/generate", (req, res) => {
-  const newKey = {
-    key: generateKey(),
-    createdAt: new Date().toISOString(),
-    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-    status: "active"
-  };
-  keys.push(newKey);
-  saveKeys();
-  res.json({ success: true, key: newKey });
-});
-
-// Verify key validity
-app.get("/verify", (req, res) => {
-  const { key } = req.query;
-  const found = keys.find(k => k.key === key);
-  if (!found) return res.json({ valid: false, message: "❌ Invalid key" });
-
-  const now = new Date();
-  const expired = new Date(found.expiresAt) <= now;
-  if (expired || found.status === "off") {
-    return res.json({ valid: false, message: "⚠️ Key expired or deactivated" });
-  }
-
-  res.json({ valid: true, message: "✅ Key is valid" });
-});
-
-// Admin login
+// ✅ Admin Login
 app.post("/admin/login", (req, res) => {
   const { password } = req.body;
   res.json({ success: password === ADMIN_PASSWORD });
 });
 
-// Admin – get all keys
+// ✅ Get all keys
 app.get("/admin/keys", (req, res) => {
-  res.json({ keys });
+  res.json({ keys: readKeys() });
 });
 
-// Admin – toggle key ON/OFF
+// ✅ Generate new key (default 7 days expiry)
+app.post("/admin/generate", (req, res) => {
+  const { days = 7 } = req.body;
+  const newKey = Math.random().toString(36).substring(2, 12);
+  const expiry = Date.now() + days * 24 * 60 * 60 * 1000;
+  const keyData = { key: newKey, status: "active", expiry };
+  const keys = readKeys();
+  keys.push(keyData);
+  saveKeys(keys);
+  res.json({ success: true, key: keyData });
+});
+
+// ✅ Toggle ON/OFF
 app.post("/admin/toggle", (req, res) => {
   const { key } = req.body;
-  const found = keys.find(k => k.key === key);
-  if (found) {
-    found.status = found.status === "active" ? "off" : "active";
-    saveKeys();
-    return res.json({ success: true, status: found.status });
-  }
-  res.json({ success: false });
+  let keys = readKeys();
+  const idx = keys.findIndex(k => k.key === key);
+  if (idx === -1) return res.json({ success: false });
+  keys[idx].status = keys[idx].status === "active" ? "inactive" : "active";
+  saveKeys(keys);
+  res.json({ success: true, status: keys[idx].status });
 });
 
-// Admin – delete key
+// ✅ Delete key
 app.post("/admin/delete", (req, res) => {
   const { key } = req.body;
-  keys = keys.filter(k => k.key !== key);
-  saveKeys();
+  const keys = readKeys().filter(k => k.key !== key);
+  saveKeys(keys);
   res.json({ success: true });
 });
 
-app.get("/", (req, res) => {
-  res.send("🔥 Welcome to Roni API System with Expiry 🔥");
+// ✅ Check key (for app login)
+app.post("/check", (req, res) => {
+  const { key } = req.body;
+  const keys = readKeys();
+  const item = keys.find(k => k.key === key);
+  if (!item) return res.json({ valid: false, message: "Invalid key" });
+  if (Date.now() > item.expiry) return res.json({ valid: false, message: "Expired key" });
+  if (item.status !== "active") return res.json({ valid: false, message: "Key disabled" });
+  res.json({ valid: true, message: "Key valid" });
 });
 
-app.get("/admin", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "admin.html"));
-});
-
-app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`🚀 Roni API System running on port ${PORT}`));
