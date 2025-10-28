@@ -1,207 +1,158 @@
-<!doctype html>
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Roni — Admin Panel</title>
-  <style>
-    body{background:#000;color:#0f0;font-family:Arial;text-align:center;padding:18px}
-    .card{background:#071015;padding:12px;border-radius:8px;margin:10px auto;max-width:1000px;border:1px solid #063}
-    input,button,select{padding:8px;border-radius:6px;border:1px solid #063;background:#020a08;color:#0f0}
-    table{width:100%;border-collapse:collapse;margin-top:12px}
-    th,td{padding:8px;border:1px solid rgba(0,255,136,0.06);font-size:14px}
-    .btn{background:#0f0;color:#000;border:none;padding:8px 10px;border-radius:6px;cursor:pointer}
-    .danger{background:#ff6666;color:#000}
-    .small{font-size:13px;color:#9f9}
-    .muted{color:#7a7}
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>🔥 Roni Admin Panel</title>
+<style>
+  body {
+    background: #000;
+    color: #00ff88;
+    font-family: "Poppins", sans-serif;
+    text-align: center;
+    padding: 20px;
+  }
+  h1 {
+    color: #00ffaa;
+    font-size: 28px;
+  }
+  input, button, select {
+    padding: 10px;
+    margin: 6px;
+    border-radius: 10px;
+    border: none;
+    font-size: 15px;
+  }
+  input {
+    background: #111;
+    color: #0f0;
+    border: 1px solid #00ff80;
+    text-align: center;
+    width: 250px;
+  }
+  button {
+    background: #00ff80;
+    color: #000;
+    font-weight: bold;
+    cursor: pointer;
+    transition: 0.2s;
+  }
+  button:hover {
+    background: #0f0;
+    transform: scale(1.05);
+  }
+  #keys {
+    margin-top: 20px;
+  }
+  .key-box {
+    background: #111;
+    border: 1px solid #00ff80;
+    padding: 10px;
+    margin: 10px auto;
+    width: 340px;
+    border-radius: 10px;
+  }
+  .key-box p { margin: 5px; }
+  .actions button {
+    margin: 4px;
+    border-radius: 8px;
+    padding: 6px 10px;
+  }
+  .delete { background: red; color: #fff; }
+  .toggle { background: orange; color: #000; }
+</style>
 </head>
 <body>
-  <h1>🕶 Roni — Admin Panel</h1>
-  <div class="card">
-    <div id="loginArea">
-      <div class="small">Enter admin password (stored session only)</div>
-      <input id="adminPass" type="password" placeholder="Admin password"/>&nbsp;
-      <button class="btn" onclick="adminLogin()">Login</button>
-      <div id="loginMsg" class="muted"></div>
-    </div>
+  <h1>🔥 Roni API Admin Panel</h1>
 
-    <div id="adminArea" style="display:none">
-      <div style="display:flex;gap:8px;align-items:center;justify-content:center;margin:10px 0">
-        <input id="gName" placeholder="Name"/>
-        <input id="gEmail" placeholder="Email"/>
-        <input id="gQty" type="number" min="1" max="100" value="1" style="width:80px"/>
-        <input id="gExpires" type="date" title="Optional expiry date"/>
-        <button class="btn" onclick="generateAdmin()">Generate</button>
-        <button class="btn danger" onclick="logout()">Logout</button>
-      </div>
+  <div id="login">
+    <h3>Enter Admin Password 🔐</h3>
+    <input type="password" id="pass" placeholder="Enter password" />
+    <br />
+    <button onclick="login()">Login</button>
+    <p id="msg"></p>
+  </div>
 
-      <div class="small muted">Tip: to set expiry date choose a date. Remove to make unlimited.</div>
-
-      <table id="keysTable">
-        <thead><tr><th>Name</th><th>Email</th><th>Key</th><th>Created</th><th>Expires</th><th>Active</th><th>Actions</th></tr></thead>
-        <tbody></tbody>
-      </table>
-      <div style="margin-top:10px">
-        <button class="btn" onclick="loadKeys()">Refresh</button>
-      </div>
-    </div>
+  <div id="panel" style="display:none;">
+    <h3>Generate New Key</h3>
+    <select id="days">
+      <option value="1">1 Day</option>
+      <option value="5">5 Days</option>
+      <option value="7">7 Days</option>
+    </select>
+    <button onclick="generateKey()">Generate</button>
+    <h3>All Keys</h3>
+    <div id="keys"></div>
   </div>
 
 <script>
-const API_BASE = location.origin;
-function authHeader() {
-  const s = sessionStorage.getItem('RONI_ADMIN_PASS');
-  return s ? { 'Authorization': 'Bearer ' + s, 'Content-Type': 'application/json' } : null;
-}
-
-async function adminLogin() {
-  const pass = document.getElementById('adminPass').value.trim();
-  if (!pass) { document.getElementById('loginMsg').innerText = 'Enter password'; return; }
-
-  // quick check: call protected list endpoint
-  try {
-    const r = await fetch(API_BASE + '/api/admin/keys', { headers: { 'Authorization': 'Bearer ' + pass }});
-    if (r.status === 200) {
-      sessionStorage.setItem('RONI_ADMIN_PASS', pass);
-      document.getElementById('loginArea').style.display = 'none';
-      document.getElementById('adminArea').style.display = 'block';
-      document.getElementById('loginMsg').innerText = 'Logged in';
-      loadKeys();
-    } else {
-      const j = await r.json().catch(()=>({}));
-      document.getElementById('loginMsg').innerText = 'Login failed';
-      console.log(j);
-    }
-  } catch (e) {
-    document.getElementById('loginMsg').innerText = 'Network error';
-  }
-}
-
-function logout(){
-  sessionStorage.removeItem('RONI_ADMIN_PASS');
-  document.getElementById('loginArea').style.display = 'block';
-  document.getElementById('adminArea').style.display = 'none';
-  document.getElementById('adminPass').value = '';
-}
-
-async function loadKeys() {
-  const hdr = authHeader();
-  if (!hdr) { logout(); return; }
-  try {
-    const r = await fetch(API_BASE + '/api/admin/keys', { headers: hdr });
-    if (r.status === 401) { logout(); return; }
-    const data = await r.json();
-    const tbody = document.querySelector('#keysTable tbody');
-    tbody.innerHTML = '';
-    data.slice().reverse().forEach(k => {
-      const tr = document.createElement('tr');
-      const expires = k.expires ? new Date(k.expires).toLocaleString() : '—';
-      const created = k.created ? new Date(k.created).toLocaleString() : '—';
-      tr.innerHTML = `
-        <td>${escapeHtml(k.name || '')}</td>
-        <td>${escapeHtml(k.email || '')}</td>
-        <td><code>${k.key}</code></td>
-        <td>${created}</td>
-        <td>${expires}</td>
-        <td>${k.active ? '✅' : '❌'}</td>
-        <td>
-          <button onclick="toggleKey('${k.key}')" class="btn">${k.active ? 'Revoke' : 'Activate'}</button>
-          <button onclick="showExpirePrompt('${k.key}')" class="btn">Expire</button>
-          <button onclick="deleteKey('${k.key}')" class="btn danger">Delete</button>
-        </td>`;
-      tbody.appendChild(tr);
-    });
-  } catch(e) {
-    console.error(e);
-    alert('Failed to load keys');
-  }
-}
-
-async function toggleKey(key) {
-  if (!confirm('Toggle active for ' + key + '?')) return;
-  const hdr = authHeader();
-  const r = await fetch(API_BASE + '/api/admin/toggle', { method:'POST', headers: hdr, body: JSON.stringify({ key })});
-  const j = await r.json();
-  if (r.ok) loadKeys(); else alert('Error: ' + (j.error || JSON.stringify(j)));
-}
-
-async function deleteKey(key) {
-  if (!confirm('Delete key: ' + key + ' ?')) return;
-  const hdr = authHeader();
-  const r = await fetch(API_BASE + '/api/admin/delete', { method:'POST', headers: hdr, body: JSON.stringify({ key })});
-  const j = await r.json();
-  if (r.ok) loadKeys(); else alert('Error: ' + (j.error || JSON.stringify(j)));
-}
-
-function showExpirePrompt(key) {
-  const date = prompt('Enter expiry date (YYYY-MM-DD) or empty to remove expiry:');
-  if (date === null) return;
-  let iso = null;
-  if (date.trim()) {
-    const d = new Date(date + 'T23:59:59Z');
-    if (isNaN(d)) return alert('Invalid date format');
-    iso = d.toISOString();
-  }
-  expireKey(key, iso);
-}
-
-async function expireKey(key, iso) {
-  const hdr = authHeader();
-  const r = await fetch(API_BASE + '/api/admin/expire', { method:'POST', headers: hdr, body: JSON.stringify({ key, expiresISO: iso })});
-  const j = await r.json();
-  if (r.ok) loadKeys(); else alert('Error: ' + (j.error || JSON.stringify(j)));
-}
-
-async function generateAdmin() {
-  const name = document.getElementById('gName').value.trim() || 'admin-created';
-  const email = document.getElementById('gEmail').value.trim() || 'admin@local';
-  const qty = parseInt(document.getElementById('gQty').value || '1');
-  const expiresDate = document.getElementById('gExpires').value; // YYYY-MM-DD or empty
-  let expiresDays = null;
-  let expiresISO = null;
-  if (expiresDate) {
-    const d = new Date(expiresDate + 'T23:59:59Z');
-    expiresISO = d.toISOString();
-    // admin endpoint supports expiry via expiresDays or you can modify to accept ISO; we used expiresDays in server,
-    // but our server accepts expiresDays (days) OR we used expiresISO. For compatibility we'll call admin/generate then expire.
-  }
-
-  const hdr = authHeader();
-  const r = await fetch(API_BASE + '/api/admin/generate', {
-    method: 'POST',
-    headers: hdr,
-    body: JSON.stringify({ name, email, qty, note: 'admin', expiresDays: null })
+async function login() {
+  const password = document.getElementById("pass").value;
+  const res = await fetch("/admin/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ password })
   });
-  const j = await r.json();
-  if (!r.ok) return alert('Error: ' + (j.error || JSON.stringify(j)));
-  // If admin provided a specific date, set expiry for created items
-  if (expiresISO && j.generated && j.generated.length) {
-    for (const row of j.generated) {
-      await fetch(API_BASE + '/api/admin/expire', {
-        method: 'POST',
-        headers: hdr,
-        body: JSON.stringify({ key: row.key, expiresISO })
-      });
-    }
+  const data = await res.json();
+  if (data.success) {
+    document.getElementById("login").style.display = "none";
+    document.getElementById("panel").style.display = "block";
+    loadKeys();
+  } else {
+    document.getElementById("msg").innerText = "❌ Wrong password!";
   }
-  alert('Generated ' + (j.generated ? j.generated.length : 1) + ' keys');
+}
+
+async function generateKey() {
+  const days = parseInt(document.getElementById("days").value);
+  await fetch("/admin/generate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ days })
+  });
   loadKeys();
 }
 
-function escapeHtml(s) {
-  if (!s) return '';
-  return s.replace(/[&<>"'`]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;',"`":'&#96;'}[m]));
+async function loadKeys() {
+  const res = await fetch("/admin/keys");
+  const data = await res.json();
+  const container = document.getElementById("keys");
+  container.innerHTML = "";
+  data.keys.forEach(k => {
+    const expiry = new Date(k.expiry).toLocaleString();
+    const div = document.createElement("div");
+    div.className = "key-box";
+    div.innerHTML = `
+      <p><b>${k.key}</b></p>
+      <p>Status: ${k.status === "active" ? "🟢 Active" : "🔴 Inactive"}</p>
+      <p>Expires: ${expiry}</p>
+      <div class="actions">
+        <button class="toggle" onclick="toggleKey('${k.key}')">Toggle</button>
+        <button class="delete" onclick="deleteKey('${k.key}')">Delete</button>
+      </div>
+    `;
+    container.appendChild(div);
+  });
 }
 
-// auto-login if pass stored
-window.addEventListener('load', () => {
-  const pass = sessionStorage.getItem('RONI_ADMIN_PASS'); 
-  if (pass) {
-    document.getElementById('adminPass').value = pass;
-    adminLogin();
-  }
-});
+async function toggleKey(key) {
+  await fetch("/admin/toggle", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ key })
+  });
+  loadKeys();
+}
+
+async function deleteKey(key) {
+  if (!confirm("Delete " + key + "?")) return;
+  await fetch("/admin/delete", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ key })
+  });
+  loadKeys();
+}
 </script>
 </body>
 </html>
