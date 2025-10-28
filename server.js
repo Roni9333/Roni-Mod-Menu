@@ -1,60 +1,67 @@
 import express from "express";
 import fs from "fs";
-import cors from "cors";
-import bodyParser from "body-parser";
+import path from "path";
 
 const app = express();
-app.use(cors());
-app.use(bodyParser.json());
+app.use(express.json());
 app.use(express.static("public"));
 
+const PORT = process.env.PORT || 3000;
 const KEYS_FILE = "keys.json";
-const ADMIN_PASSWORD = "roni6294"; // Change if you want
+const ADMIN_PASSWORD = "roni6294"; // 🔐 apna password yahan change karo
 
-// Helper: Read + Save keys
+// --- Read/Save Helper Functions ---
 function readKeys() {
   if (!fs.existsSync(KEYS_FILE)) fs.writeFileSync(KEYS_FILE, "[]");
-  return JSON.parse(fs.readFileSync(KEYS_FILE, "utf-8"));
+  return JSON.parse(fs.readFileSync(KEYS_FILE));
 }
 function saveKeys(keys) {
   fs.writeFileSync(KEYS_FILE, JSON.stringify(keys, null, 2));
 }
 
-// ✅ Admin Login
+// --- Random Key Generator ---
+function generateRandomKey() {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  let key = "RONI-";
+  for (let i = 0; i < 8; i++) key += chars[Math.floor(Math.random() * chars.length)];
+  return key;
+}
+
+// --- Admin Login ---
 app.post("/admin/login", (req, res) => {
   const { password } = req.body;
   res.json({ success: password === ADMIN_PASSWORD });
 });
 
-// ✅ Get all keys
+// --- Get All Keys ---
 app.get("/admin/keys", (req, res) => {
   res.json({ keys: readKeys() });
 });
 
-// ✅ Generate new key (default 7 days expiry)
+// --- Generate Key (for 1 / 5 / 7 days) ---
 app.post("/admin/generate", (req, res) => {
-  const { days = 7 } = req.body;
-  const newKey = Math.random().toString(36).substring(2, 12);
+  const { days } = req.body; // 1, 5, or 7
+  const newKey = generateRandomKey();
   const expiry = Date.now() + days * 24 * 60 * 60 * 1000;
-  const keyData = { key: newKey, status: "active", expiry };
+  const keyData = { key: newKey, status: "active", expiry, days };
   const keys = readKeys();
   keys.push(keyData);
   saveKeys(keys);
   res.json({ success: true, key: keyData });
 });
 
-// ✅ Toggle ON/OFF
+// --- Toggle ON/OFF ---
 app.post("/admin/toggle", (req, res) => {
   const { key } = req.body;
-  let keys = readKeys();
-  const idx = keys.findIndex(k => k.key === key);
-  if (idx === -1) return res.json({ success: false });
-  keys[idx].status = keys[idx].status === "active" ? "inactive" : "active";
+  const keys = readKeys();
+  const k = keys.find(k => k.key === key);
+  if (!k) return res.json({ success: false, msg: "Key not found" });
+  k.status = k.status === "active" ? "inactive" : "active";
   saveKeys(keys);
-  res.json({ success: true, status: keys[idx].status });
+  res.json({ success: true, status: k.status });
 });
 
-// ✅ Delete key
+// --- Delete Key ---
 app.post("/admin/delete", (req, res) => {
   const { key } = req.body;
   const keys = readKeys().filter(k => k.key !== key);
@@ -62,16 +69,19 @@ app.post("/admin/delete", (req, res) => {
   res.json({ success: true });
 });
 
-// ✅ Check key (for app login)
+// --- Verify Key (for app login) ---
 app.post("/check", (req, res) => {
   const { key } = req.body;
-  const keys = readKeys();
-  const item = keys.find(k => k.key === key);
-  if (!item) return res.json({ valid: false, message: "Invalid key" });
-  if (Date.now() > item.expiry) return res.json({ valid: false, message: "Expired key" });
-  if (item.status !== "active") return res.json({ valid: false, message: "Key disabled" });
-  res.json({ valid: true, message: "Key valid" });
+  const k = readKeys().find(x => x.key === key);
+  if (!k) return res.json({ valid: false, msg: "❌ Invalid key" });
+  if (Date.now() > k.expiry) return res.json({ valid: false, msg: "⏰ Key expired" });
+  if (k.status !== "active") return res.json({ valid: false, msg: "🚫 Key turned off" });
+  res.json({ valid: true, msg: "✅ Key is valid" });
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🚀 Roni API System running on port ${PORT}`));
+// --- Serve Admin Panel ---
+app.get("/admin", (req, res) => {
+  res.sendFile(path.join(process.cwd(), "public", "admin.html"));
+});
+
+app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
