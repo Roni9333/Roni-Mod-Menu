@@ -39,7 +39,10 @@ app.get("/verify", (req, res) => {
     return res.json({ valid: false, message: "❌ Invalid key" });
   }
 });
-
+// Admin page route
+app.get("/admin", (req, res) => {
+  res.sendFile(__dirname + "/public/admin.html");
+});
 app.get("/", (req, res) => {
   res.send("Welcome to Roni API System 💪🔥");
 });
