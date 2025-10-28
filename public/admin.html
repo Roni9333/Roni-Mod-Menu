@@ -6,3 +6,98 @@ project-folder/
 └── public/
     ├── index.html
     └── admin.html
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Admin Panel 🔑 Roni API System</title>
+<style>
+  body {
+    font-family: 'Poppins', sans-serif;
+    background-color: #0d0d0d;
+    color: #00ff99;
+    text-align: center;
+    padding: 40px;
+  }
+  input, button {
+    padding: 10px;
+    margin: 8px;
+    border: 2px solid #00ff99;
+    border-radius: 8px;
+    background: #000;
+    color: #00ff99;
+    font-size: 14px;
+  }
+  button {
+    cursor: pointer;
+  }
+  button:hover {
+    background: #00ff99;
+    color: #000;
+  }
+  .key-list {
+    margin-top: 20px;
+    text-align: left;
+    display: inline-block;
+  }
+</style>
+</head>
+<body>
+  <h1>🧑‍💻 Admin Panel — Roni API System</h1>
+
+  <div id="loginSection">
+    <input type="password" id="adminPass" placeholder="Enter Admin Password">
+    <button onclick="login()">Login</button>
+    <p id="loginMsg"></p>
+  </div>
+
+  <div id="panel" style="display:none;">
+    <h2>All Generated Keys</h2>
+    <div id="keyList" class="key-list"></div>
+  </div>
+
+  <script>
+    const apiBase = "https://roni-api-system.onrender.com";
+    
+    async function login() {
+      const password = document.getElementById("adminPass").value.trim();
+      const res = await fetch(apiBase + "/admin/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password })
+      });
+      const data = await res.json();
+      if (data.success) {
+        document.getElementById("loginSection").style.display = "none";
+        document.getElementById("panel").style.display = "block";
+        loadKeys();
+      } else {
+        document.getElementById("loginMsg").innerText = data.message || "Login failed!";
+      }
+    }
+
+    async function loadKeys() {
+      const res = await fetch(apiBase + "/admin/keys");
+      const data = await res.json();
+      const listDiv = document.getElementById("keyList");
+      listDiv.innerHTML = "";
+      data.keys.forEach(k => {
+        const el = document.createElement("div");
+        el.innerHTML = `🔑 ${k} <button onclick="deleteKey('${k}')">❌ Delete</button>`;
+        listDiv.appendChild(el);
+      });
+    }
+
+    async function deleteKey(key) {
+      await fetch(apiBase + "/admin/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key })
+      });
+      loadKeys();
+    }
+  </script>
+</body>
+</html>
