@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Roni Mod Menu — Admin Panel</title>
+  <style>
+    body {
+      background: #0b0b0b;
+      color: #fff;
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 20px;
+    }
+    h1 { color: #00ff88; margin-bottom: 20px; }
+    input, button, select {
+      padding: 10px;
+      margin: 6px;
+      border: none;
+      border-radius: 8px;
+    }
+    input, select { width: 60%; }
+    button {
+      background: #00ff88;
+      color: #000;
+      cursor: pointer;
+    }
+    button:hover { background: #00cc6a; }
+    table {
+      width: 100%;
+      margin-top: 20px;
+      border-collapse: collapse;
+    }
+    th, td {
+      border: 1px solid #00ff88;
+      padding: 8px;
+    }
+    th { background: #00ff88; color: #000; }
+    td { color: #fff; }
+  </style>
+</head>
+<body>
+  <h1>☠️Roni Mod Menu☠️</h1>
+  <input id="keyInput" placeholder="Enter new key" />
+  <input id="daysInput" type="number" placeholder="Valid Days (e.g. 7)" />
+  <select id="statusInput">
+    <option value="true">ON</option>
+    <option value="false">OFF</option>
+  </select>
+  <button onclick="addKey()">Add Key</button>
+  <div id="result"></div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Key</th>
+        <th>Status</th>
+        <th>Created</th>
+        <th>Expiry</th>
+        <th>Used On</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody id="keyTable"></tbody>
+  </table>
+
+  <script>
+    async function loadKeys() {
+      const res = await fetch('/admin/keys');
+      const keys = await res.json();
+      const tbody = document.getElementById('keyTable');
+      tbody.innerHTML = '';
+      keys.forEach(k => {
+        tbody.innerHTML += `
+          <tr>
+            <td>${k.key}</td>
+            <td>${k.active ? "✅ ON" : "❌ OFF"}</td>
+            <td>${k.created}</td>
+            <td>${k.expiry}</td>
+            <td>${k.usedOn || "-"}</td>
+            <td><button onclick="toggleKey('${k.key}')">Toggle</button></td>
+          </tr>
+        `;
+      });
+    }
+
+    async function addKey() {
+      const newKey = document.getElementById('keyInput').value.trim();
+      const days = document.getElementById('daysInput').value;
+      const active = document.getElementById('statusInput').value === 'true';
+      if (!newKey || !days) return alert("Enter key and days!");
+
+      const res = await fetch('/admin/addkey', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newKey, days, active })
+      });
+
+      const data = await res.json();
+      document.getElementById('result').innerText = data.message;
+      loadKeys();
+    }
+
+    async function toggleKey(key) {
+      const res = await fetch('/admin/toggle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key })
+      });
+      const data = await res.json();
+      alert(data.message);
+      loadKeys();
+    }
+
+    loadKeys();
+  </script>
+</body>
+</html>
