@@ -1,173 +1,102 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Roni Mod Menu — Admin</title>
-<link rel="stylesheet" href="/style.css">
+<meta charset="UTF-8">
+<title>Roni Mod Menu — Admin Panel</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  body {
+    background: #0a0a0a;
+    color: #00ff99;
+    font-family: monospace;
+    text-align: center;
+    padding: 20px;
+  }
+  input, button {
+    margin: 8px;
+    padding: 8px;
+    background: black;
+    color: #00ff99;
+    border: 1px solid #00ff99;
+    border-radius: 6px;
+  }
+  button:hover { background: #00ff99; color: black; }
+  table {
+    margin: 20px auto;
+    border-collapse: collapse;
+    width: 90%;
+  }
+  th, td {
+    border: 1px solid #00ff99;
+    padding: 8px;
+  }
+</style>
 </head>
 <body>
-  <header class="topbar">
-    <div>
-      <strong>Roni Mod Menu</strong>
-      <div class="muted tiny">Admin Panel</div>
-    </div>
-    <div>
-      <button class="text-btn" id="logoutBtn">Logout</button>
-    </div>
-  </header>
+  <h2>☠️ Roni Mod Menu Admin Panel ☠️</h2>
 
-  <main class="container">
-    <section class="card">
-      <h2 class="section-title">Create Key</h2>
-      <input id="newKey" placeholder="Key string (e.g. RONI123)" />
-      <div style="display:flex;gap:8px">
-        <input id="days" type="number" placeholder="Valid days (e.g. 7)" style="flex:1"/>
-        <select id="active" style="width:120px">
-          <option value="true">ON</option>
-          <option value="false">OFF</option>
-        </select>
-      </div>
-      <button id="addBtn">➕ Add Key</button>
-      <p id="addMsg" class="msg"></p>
-    </section>
+  <input id="newKey" placeholder="Enter new key">
+  <input id="days" placeholder="Days valid">
+  <button onclick="addKey()">➕ Add Key</button>
 
-    <section class="card">
-      <h2 class="section-title">Keys & Controls</h2>
-      <div id="keysList" class="list"></div>
-      <p id="listMsg" class="msg"></p>
-    </section>
-
-    <section class="card">
-      <h2 class="section-title">Quick Test</h2>
-      <input id="testKey" placeholder="Key to test" />
-      <button id="testBtn">✅ Test Key</button>
-      <p id="testMsg" class="msg"></p>
-    </section>
-  </main>
+  <table id="keysTable">
+    <thead>
+      <tr><th>Key</th><th>Active</th><th>Expiry</th><th>Toggle</th><th>Delete</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
 
 <script>
-const token = localStorage.getItem('rm_admin_token');
-if (!token) {
-  window.location.href = '/login.html';
+async function loadKeys(){
+  const res = await fetch("/admin/keys");
+  const data = await res.json();
+  const tbody = document.querySelector("#keysTable tbody");
+  tbody.innerHTML = "";
+  data.forEach(k=>{
+    tbody.innerHTML += `<tr>
+      <td>${k.key}</td>
+      <td>${k.active ? "✅" : "❌"}</td>
+      <td>${k.expiry}</td>
+      <td><button onclick="toggleKey('${k.key}')">Toggle</button></td>
+      <td><button onclick="deleteKey('${k.key}')">Delete</button></td>
+    </tr>`;
+  });
 }
 
-// helpers
-const headers = () => ({
-  'Content-Type': 'application/json',
-  'x-admin-token': token // backend should accept this header for admin routes
-});
-
-async function fetchKeys() {
-  try {
-    const res = await fetch('/admin/keys', { headers: headers() });
-    if (res.status === 401) { logout(); return; }
-    const keys = await res.json();
-    renderKeys(keys);
-  } catch (err) {
-    document.getElementById('listMsg').innerText = 'Unable to load keys';
-  }
+async function addKey(){
+  const newKey = document.getElementById("newKey").value;
+  const days = document.getElementById("days").value;
+  const res = await fetch("/admin/addkey", {
+    method:"POST", headers:{ "Content-Type":"application/json" },
+    body: JSON.stringify({ newKey, days, active:true })
+  });
+  const data = await res.json();
+  alert(data.message);
+  loadKeys();
 }
 
-function renderKeys(keys) {
-  const wrap = document.getElementById('keysList');
-  if (!Array.isArray(keys) || keys.length === 0) {
-    wrap.innerHTML = '<div class="muted">No keys yet</div>';
-    return;
-  }
-  wrap.innerHTML = keys.map(k => {
-    const on = k.active ? 'ON' : 'OFF';
-    return `<div class="row">
-      <div class="col">
-        <div class="keyname">${k.key}</div>
-        <div class="muted tiny">Created: ${k.created} • Expires: ${k.expiry} • Used: ${k.usedOn || '-'}</div>
-      </div>
-      <div class="col actions">
-        <button onclick="toggle('${k.key}')" class="small">${on}</button>
-        <button onclick="removeKey('${k.key}')" class="small danger">DEL</button>
-      </div>
-    </div>`;
-  }).join('');
+async function toggleKey(key){
+  const res = await fetch("/admin/toggle", {
+    method:"POST", headers:{ "Content-Type":"application/json" },
+    body: JSON.stringify({ key })
+  });
+  const data = await res.json();
+  alert(data.message);
+  loadKeys();
 }
 
-async function addKey() {
-  const newKey = document.getElementById('newKey').value.trim();
-  const days = Number(document.getElementById('days').value || 0);
-  const active = document.getElementById('active').value === 'true';
-  const msg = document.getElementById('addMsg');
-  msg.innerText = '';
-
-  if (!newKey || !days) { msg.innerText = 'Enter key and days'; return; }
-
-  try {
-    const res = await fetch('/admin/addkey', {
-      method: 'POST',
-      headers: headers(),
-      body: JSON.stringify({ newKey, days, active })
-    });
-    const data = await res.json();
-    msg.innerText = data.message || 'Added';
-    fetchKeys();
-  } catch (err) {
-    msg.innerText = 'Add failed';
-  }
+async function deleteKey(key){
+  if (!confirm("Delete key " + key + "?")) return;
+  const res = await fetch("/admin/delete", {
+    method:"POST", headers:{ "Content-Type":"application/json" },
+    body: JSON.stringify({ key })
+  });
+  const data = await res.json();
+  alert(data.message);
+  loadKeys();
 }
 
-async function toggle(key) {
-  try {
-    const res = await fetch('/admin/toggle', {
-      method: 'POST',
-      headers: headers(),
-      body: JSON.stringify({ key })
-    });
-    const data = await res.json();
-    alert(data.message || 'Toggled');
-    fetchKeys();
-  } catch {
-    alert('Toggle failed');
-  }
-}
-
-async function removeKey(key) {
-  if (!confirm('Delete key ' + key + ' ?')) return;
-  try {
-    const res = await fetch('/admin/remove', {
-      method: 'POST',
-      headers: headers(),
-      body: JSON.stringify({ key })
-    });
-    const data = await res.json();
-    alert(data.message || 'Removed');
-    fetchKeys();
-  } catch {
-    alert('Remove failed');
-  }
-}
-
-async function testKey() {
-  const key = document.getElementById('testKey').value.trim();
-  const out = document.getElementById('testMsg');
-  out.innerText = '';
-  if (!key) { out.innerText = 'Enter a key'; return; }
-  try {
-    const res = await fetch('/public/connect?key=' + encodeURIComponent(key));
-    const data = await res.json();
-    out.innerText = data.message || JSON.stringify(data);
-  } catch {
-    out.innerText = 'Test failed';
-  }
-}
-
-function logout() {
-  localStorage.removeItem('rm_admin_token');
-  window.location.href = '/login.html';
-}
-
-document.getElementById('addBtn').onclick = addKey;
-document.getElementById('testBtn').onclick = testKey;
-document.getElementById('logoutBtn').onclick = logout;
-
-fetchKeys();
+loadKeys();
 </script>
 </body>
 </html>
