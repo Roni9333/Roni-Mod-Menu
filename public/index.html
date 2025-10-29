@@ -53,12 +53,18 @@ async function generatePreset(days){
   document.getElementById('customDays').value = days;
   await generate();
 }
+
 async function generate(){
   const days = document.getElementById('customDays').value.trim();
   const q = days ? `?days=${encodeURIComponent(days)}` : '';
   document.getElementById('result').innerText = '⏳ Generating...';
   try {
-    const res = await fetch('/generate' + q);
+    const res = await fetch("https://roni-api-system.onrender.com/generate" + q, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: "roni6294", days }),
+    });
+
     const j = await res.json();
     if (j.success && j.key){
       const k = j.key;
@@ -66,10 +72,10 @@ async function generate(){
       const exp = k.expiresAt ? new Date(k.expiresAt).toLocaleString() : 'Never';
       document.getElementById('result').innerHTML = `✅ <b>${k.key}</b><br>Created: ${created}<br>Expires: ${exp}`;
     } else {
-      document.getElementById('result').innerText = 'Error generating key';
+      document.getElementById('result').innerText = 'Error: ' + (j.error || 'Unknown error');
     }
   } catch(e){
-    document.getElementById('result').innerText = 'Network error';
+    document.getElementById('result').innerText = 'Network error: ' + e.message;
   }
 }
 
@@ -78,7 +84,7 @@ async function verify(){
   if (!key) return alert('Enter key');
   document.getElementById('verifyMsg').innerText = '⏳ Checking...';
   try{
-    const res = await fetch('/verify?key=' + encodeURIComponent(key));
+    const res = await fetch("https://roni-api-system.onrender.com/verify?key=" + encodeURIComponent(key));
     const j = await res.json();
     document.getElementById('verifyMsg').innerText = j.message || JSON.stringify(j);
   }catch(e){
@@ -86,5 +92,3 @@ async function verify(){
   }
 }
 </script>
-</body>
-</html>
