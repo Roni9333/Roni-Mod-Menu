@@ -85,3 +85,12 @@ app.post("/admin/toggle", (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`🚀 Roni Mod Menu API running on port ${PORT}`));
+// ✅ Always return JSON for invalid API routes
+app.use((req, res, next) => {
+  if (req.path.startsWith("/admin") || req.path.startsWith("/public")) {
+    return res.status(404).json({ success: false, message: "❌ Invalid API endpoint" });
+  } else {
+    // Serve frontend (index.html)
+    return res.sendFile(path.resolve("public/index.html"));
+  }
+});
