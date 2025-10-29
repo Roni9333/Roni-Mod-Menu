@@ -1,11 +1,3 @@
 {
-  "keys": [
-    {
-      "key": "RONI123",
-      "active": true,
-      "created": "2025-10-29",
-      "expiry": "2025-11-05",
-      "usedOn": null
-    }
-  ]
+  "keys": []
 }
