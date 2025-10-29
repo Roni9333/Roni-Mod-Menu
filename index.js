@@ -90,6 +90,18 @@ app.post("/admin/toggle", (req, res) => {
   res.json({ success: true, message: `🔄 Key ${key} is now ${found.active ? "ON ✅" : "OFF ❌"}` });
 });
 
+// 🗑️ Delete Key
+app.post("/admin/delete", (req, res) => {
+  const { key } = req.body;
+  const keys = readKeys();
+  const filtered = keys.filter(k => k.key !== key);
+  if (filtered.length === keys.length)
+    return res.json({ success: false, message: "❌ Key not found" });
+
+  writeKeys(filtered);
+  res.json({ success: true, message: `🗑️ Key ${key} deleted successfully!` });
+});
+
 // ✅ Serve UI (index.html)
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
