@@ -1,118 +1,173 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Roni Mod Menu — Admin Panel</title>
-  <style>
-    body {
-      background: #0b0b0b;
-      color: #fff;
-      font-family: Arial, sans-serif;
-      text-align: center;
-      padding: 20px;
-    }
-    h1 { color: #00ff88; margin-bottom: 20px; }
-    input, button, select {
-      padding: 10px;
-      margin: 6px;
-      border: none;
-      border-radius: 8px;
-    }
-    input, select { width: 60%; }
-    button {
-      background: #00ff88;
-      color: #000;
-      cursor: pointer;
-    }
-    button:hover { background: #00cc6a; }
-    table {
-      width: 100%;
-      margin-top: 20px;
-      border-collapse: collapse;
-    }
-    th, td {
-      border: 1px solid #00ff88;
-      padding: 8px;
-    }
-    th { background: #00ff88; color: #000; }
-    td { color: #fff; }
-  </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Roni Mod Menu — Admin</title>
+<link rel="stylesheet" href="/style.css">
 </head>
 <body>
-  <h1>☠️Roni Mod Menu☠️</h1>
-  <input id="keyInput" placeholder="Enter new key" />
-  <input id="daysInput" type="number" placeholder="Valid Days (e.g. 7)" />
-  <select id="statusInput">
-    <option value="true">ON</option>
-    <option value="false">OFF</option>
-  </select>
-  <button onclick="addKey()">Add Key</button>
-  <div id="result"></div>
+  <header class="topbar">
+    <div>
+      <strong>Roni Mod Menu</strong>
+      <div class="muted tiny">Admin Panel</div>
+    </div>
+    <div>
+      <button class="text-btn" id="logoutBtn">Logout</button>
+    </div>
+  </header>
 
-  <table>
-    <thead>
-      <tr>
-        <th>Key</th>
-        <th>Status</th>
-        <th>Created</th>
-        <th>Expiry</th>
-        <th>Used On</th>
-        <th>Action</th>
-      </tr>
-    </thead>
-    <tbody id="keyTable"></tbody>
-  </table>
+  <main class="container">
+    <section class="card">
+      <h2 class="section-title">Create Key</h2>
+      <input id="newKey" placeholder="Key string (e.g. RONI123)" />
+      <div style="display:flex;gap:8px">
+        <input id="days" type="number" placeholder="Valid days (e.g. 7)" style="flex:1"/>
+        <select id="active" style="width:120px">
+          <option value="true">ON</option>
+          <option value="false">OFF</option>
+        </select>
+      </div>
+      <button id="addBtn">➕ Add Key</button>
+      <p id="addMsg" class="msg"></p>
+    </section>
 
-  <script>
-    async function loadKeys() {
-      const res = await fetch('/admin/keys');
-      const keys = await res.json();
-      const tbody = document.getElementById('keyTable');
-      tbody.innerHTML = '';
-      keys.forEach(k => {
-        tbody.innerHTML += `
-          <tr>
-            <td>${k.key}</td>
-            <td>${k.active ? "✅ ON" : "❌ OFF"}</td>
-            <td>${k.created}</td>
-            <td>${k.expiry}</td>
-            <td>${k.usedOn || "-"}</td>
-            <td><button onclick="toggleKey('${k.key}')">Toggle</button></td>
-          </tr>
-        `;
-      });
-    }
+    <section class="card">
+      <h2 class="section-title">Keys & Controls</h2>
+      <div id="keysList" class="list"></div>
+      <p id="listMsg" class="msg"></p>
+    </section>
 
-    async function addKey() {
-      const newKey = document.getElementById('keyInput').value.trim();
-      const days = document.getElementById('daysInput').value;
-      const active = document.getElementById('statusInput').value === 'true';
-      if (!newKey || !days) return alert("Enter key and days!");
+    <section class="card">
+      <h2 class="section-title">Quick Test</h2>
+      <input id="testKey" placeholder="Key to test" />
+      <button id="testBtn">✅ Test Key</button>
+      <p id="testMsg" class="msg"></p>
+    </section>
+  </main>
 
-      const res = await fetch('/admin/addkey', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ newKey, days, active })
-      });
+<script>
+const token = localStorage.getItem('rm_admin_token');
+if (!token) {
+  window.location.href = '/login.html';
+}
 
-      const data = await res.json();
-      document.getElementById('result').innerText = data.message;
-      loadKeys();
-    }
+// helpers
+const headers = () => ({
+  'Content-Type': 'application/json',
+  'x-admin-token': token // backend should accept this header for admin routes
+});
 
-    async function toggleKey(key) {
-      const res = await fetch('/admin/toggle', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key })
-      });
-      const data = await res.json();
-      alert(data.message);
-      loadKeys();
-    }
+async function fetchKeys() {
+  try {
+    const res = await fetch('/admin/keys', { headers: headers() });
+    if (res.status === 401) { logout(); return; }
+    const keys = await res.json();
+    renderKeys(keys);
+  } catch (err) {
+    document.getElementById('listMsg').innerText = 'Unable to load keys';
+  }
+}
 
-    loadKeys();
-  </script>
+function renderKeys(keys) {
+  const wrap = document.getElementById('keysList');
+  if (!Array.isArray(keys) || keys.length === 0) {
+    wrap.innerHTML = '<div class="muted">No keys yet</div>';
+    return;
+  }
+  wrap.innerHTML = keys.map(k => {
+    const on = k.active ? 'ON' : 'OFF';
+    return `<div class="row">
+      <div class="col">
+        <div class="keyname">${k.key}</div>
+        <div class="muted tiny">Created: ${k.created} • Expires: ${k.expiry} • Used: ${k.usedOn || '-'}</div>
+      </div>
+      <div class="col actions">
+        <button onclick="toggle('${k.key}')" class="small">${on}</button>
+        <button onclick="removeKey('${k.key}')" class="small danger">DEL</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function addKey() {
+  const newKey = document.getElementById('newKey').value.trim();
+  const days = Number(document.getElementById('days').value || 0);
+  const active = document.getElementById('active').value === 'true';
+  const msg = document.getElementById('addMsg');
+  msg.innerText = '';
+
+  if (!newKey || !days) { msg.innerText = 'Enter key and days'; return; }
+
+  try {
+    const res = await fetch('/admin/addkey', {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({ newKey, days, active })
+    });
+    const data = await res.json();
+    msg.innerText = data.message || 'Added';
+    fetchKeys();
+  } catch (err) {
+    msg.innerText = 'Add failed';
+  }
+}
+
+async function toggle(key) {
+  try {
+    const res = await fetch('/admin/toggle', {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({ key })
+    });
+    const data = await res.json();
+    alert(data.message || 'Toggled');
+    fetchKeys();
+  } catch {
+    alert('Toggle failed');
+  }
+}
+
+async function removeKey(key) {
+  if (!confirm('Delete key ' + key + ' ?')) return;
+  try {
+    const res = await fetch('/admin/remove', {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({ key })
+    });
+    const data = await res.json();
+    alert(data.message || 'Removed');
+    fetchKeys();
+  } catch {
+    alert('Remove failed');
+  }
+}
+
+async function testKey() {
+  const key = document.getElementById('testKey').value.trim();
+  const out = document.getElementById('testMsg');
+  out.innerText = '';
+  if (!key) { out.innerText = 'Enter a key'; return; }
+  try {
+    const res = await fetch('/public/connect?key=' + encodeURIComponent(key));
+    const data = await res.json();
+    out.innerText = data.message || JSON.stringify(data);
+  } catch {
+    out.innerText = 'Test failed';
+  }
+}
+
+function logout() {
+  localStorage.removeItem('rm_admin_token');
+  window.location.href = '/login.html';
+}
+
+document.getElementById('addBtn').onclick = addKey;
+document.getElementById('testBtn').onclick = testKey;
+document.getElementById('logoutBtn').onclick = logout;
+
+fetchKeys();
+</script>
 </body>
 </html>
