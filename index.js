@@ -1,25 +1,30 @@
 import express from "express";
 import fs from "fs";
 import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
-app.use(express.static("public"));
+app.use(express.static(path.join(__dirname, "public")));
 
-// Function to read keys
+// ✅ Read keys
 function readKeys() {
+  if (!fs.existsSync("./keys.json")) return { keys: [] };
   const data = fs.readFileSync("./keys.json");
-  return JSON.parse(data).keys;
+  return JSON.parse(data).keys || [];
 }
 
-// Function to write keys
+// ✅ Write keys
 function writeKeys(keys) {
   fs.writeFileSync("./keys.json", JSON.stringify({ keys }, null, 2));
 }
 
-// ✅ Verify Key
+// ✅ Verify Key (for app)
 app.get("/public/connect", (req, res) => {
   const key = req.query.key;
   const keys = readKeys();
@@ -45,18 +50,19 @@ app.get("/public/connect", (req, res) => {
   res.json({ success: true, message: "✅ Connected successfully — Roni Mod Menu" });
 });
 
-// 🧠 Add Key
+// ✅ Add Key
 app.post("/admin/addkey", (req, res) => {
   const { newKey, days, active } = req.body;
-  const keys = readKeys();
+  if (!newKey || !days) return res.json({ success: false, message: "Missing fields!" });
 
+  const keys = readKeys();
   const created = new Date();
   const expiry = new Date(created);
   expiry.setDate(created.getDate() + Number(days));
 
   keys.push({
     key: newKey,
-    active,
+    active: active ?? true,
     created: created.toISOString().split("T")[0],
     expiry: expiry.toISOString().split("T")[0],
     usedOn: null
@@ -66,13 +72,13 @@ app.post("/admin/addkey", (req, res) => {
   res.json({ success: true, message: `✅ Key ${newKey} added! Valid till ${expiry.toISOString().split("T")[0]}` });
 });
 
-// 🧾 Get All Keys (for Admin Panel)
+// ✅ Get All Keys (for Admin Panel)
 app.get("/admin/keys", (req, res) => {
   const keys = readKeys();
   res.json(keys);
 });
 
-// 📴 Toggle Key ON/OFF
+// ✅ Toggle ON/OFF
 app.post("/admin/toggle", (req, res) => {
   const { key } = req.body;
   const keys = readKeys();
@@ -84,13 +90,9 @@ app.post("/admin/toggle", (req, res) => {
   res.json({ success: true, message: `🔄 Key ${key} is now ${found.active ? "ON ✅" : "OFF ❌"}` });
 });
 
-app.listen(PORT, () => console.log(`🚀 Roni Mod Menu API running on port ${PORT}`));
-// ✅ Always return JSON for invalid API routes
-app.use((req, res, next) => {
-  if (req.path.startsWith("/admin") || req.path.startsWith("/public")) {
-    return res.status(404).json({ success: false, message: "❌ Invalid API endpoint" });
-  } else {
-    // Serve frontend (index.html)
-    return res.sendFile(path.resolve("public/index.html"));
-  }
+// ✅ Serve UI (index.html)
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
 });
+
+app.listen(PORT, () => console.log(`🚀 Roni Mod Menu API running on port ${PORT}`));
