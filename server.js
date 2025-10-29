@@ -162,5 +162,5 @@ app.get("/admin", (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Roni API System running on port ${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });
