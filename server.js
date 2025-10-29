@@ -41,39 +41,39 @@ function makeKeyObject(days) {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
   let suffix = "";
   for (let i = 0; i < 8; i++) suffix += chars[Math.floor(Math.random() * chars.length)];
+
   const key = `RONI-${suffix}`;
   const createdAt = Date.now();
   let expiresAt = null;
+
   if (days && Number(days) > 0) {
     expiresAt = createdAt + Number(days) * 24 * 60 * 60 * 1000;
   }
+
   return {
     key,
     createdAt,
-    expiresAt,   // null = unlimited
+    expiresAt,
     lastLogin: null,
     active: true,
-    note: ""
+    note: "",
   };
 }
 
-// generate key (GET for quick testing). Option: ?days=7 or ?preset=1|5|7|30|60
-app.get("/generate", (req, res) => {
-  const { days, preset, note } = req.query;
-  let d = 0;
-  if (preset) {
-    const map = { "1":1, "5":5, "7":7, "30":30, "60":60 };
-    d = map[preset] || 0;
-  } else if (days) {
-    d = Number(days) || 0;
-  }
-  const obj = makeKeyObject(d);
-  if (note) obj.note = String(note).slice(0,200);
-  keys.push(obj);
-  saveKeys();
-  res.json({ success: true, key: obj });
-});
+// ✅ Add this function to generate and save key
+app.post("/generate", (req, res) => {
+  const { password, days } = req.body;
 
+  if (password !== ADMIN_PASSWORD) {
+    return res.status(403).json({ error: "Invalid admin password" });
+  }
+
+  const newKey = makeKeyObject(days);
+  keys.push(newKey);
+  saveKeys();
+
+  res.json({ success: true, key: newKey });
+});
 // verify key (used by app). It updates lastLogin if valid.
 app.get("/verify", (req, res) => {
   const { key } = req.query;
